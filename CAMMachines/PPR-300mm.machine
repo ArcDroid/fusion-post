@@ -5,7 +5,7 @@
 
   <model>PPR 300mm</model>
 
-  <description>PPR 300mm</description>
+  <description></description>
 
   <control>Marlin</control>
 
@@ -28,9 +28,26 @@
   </simulation>
 
   <post>
-    <postProcessor></postProcessor>
+    <postProcessor>cloud://PPR-marlin-cutting.cps</postProcessor>
     <postProperties>
-      <Parameters/>
+      <Parameters>
+        <Parameter expression="true" name="homeAtStart" value="true"/>
+        <Parameter expression="true" name="writeMachine" value="true"/>
+        <Parameter expression="0" hexValue="0x0000000000000000" name="g0feed" value="0"/>
+        <Parameter expression="5" name="sequenceNumberIncrement" value="5"/>
+        <Parameter expression="10" name="sequenceNumberStart" value="10"/>
+        <Parameter expression="false" name="showSequenceNumbers" value="false"/>
+        <Parameter expression="true" name="allowHeadSwitches" value="true"/>
+        <Parameter expression="true" name="separateWordsWithSpace" value="true"/>
+        <Parameter expression="true" name="useRetracts" value="true"/>
+        <Parameter expression="false" name="builtin_allowHelicalMoves" value="false"/>
+        <Parameter expression="'0'" name="builtin_highFeedMapping" value="0"/>
+        <Parameter expression="0" hexValue="0x0000000000000000" name="builtin_highFeedrate" value="0"/>
+        <Parameter expression="1000" hexValue="0x408f400000000000" name="builtin_maximumCircularRadius" value="1000"/>
+        <Parameter expression="0.25" hexValue="0x3fd0000000000000" name="builtin_minimumChordLength" value="0.25"/>
+        <Parameter expression="0.01" hexValue="0x3f847ae147ae147b" name="builtin_minimumCircularRadius" value="0.01"/>
+        <Parameter expression="0.002" hexValue="0x3f60624dd2f1a9fc" name="builtin_tolerance" value="0.002"/>
+      </Parameters>
     </postProperties>
     <setupSheet></setupSheet>
     <setupSheetProperties/>
