@@ -255,7 +255,6 @@ function onSection() {
     writeln("");
   }
 
-  /*
   // wcs
   if (insertToolCall) { // force work offset when changing tool
     currentWorkOffset = undefined;
@@ -283,7 +282,6 @@ function onSection() {
       }
     }
   }
-*/
 
   forceXYZ();
 
