@@ -39,6 +39,7 @@ allowedCircularPlanes = undefined; // allow any circular motion
 properties = {
   writeMachine: true, // write machine
   homeAtStart: true, // G28 home before starting
+  g0feed: 0, // G0 feed rate
   showSequenceNumbers: false, // show sequence numbers
   sequenceNumberStart: 10, // first sequence number
   sequenceNumberIncrement: 5, // increment for sequence numbers
@@ -51,6 +52,7 @@ properties = {
 propertyDefinitions = {
   writeMachine: {title:"Write machine", description:"Output the machine settings in the header of the code.", group:0, type:"boolean"},
   homeAtStart: {title:"Home at start", description:"Home machine with G28 at start of program", group:0, type:"boolean"},
+  g0feed: {title:"G0 Feed", description:"Feed rate for G0 moves, -1 for firmware default", group:1, type:"number"},
   showSequenceNumbers: {title:"Use sequence numbers", description:"Use sequence numbers for each block of outputted code.", group:1, type:"boolean"},
   sequenceNumberStart: {title:"Start sequence number", description:"The number at which to start the sequence numbers.", group:1, type:"integer"},
   sequenceNumberIncrement: {title:"Sequence number increment", description:"The amount by which the sequence number is incremented by in each block.", group:1, type:"integer"},
@@ -69,6 +71,7 @@ var secFormat = createFormat({decimals:3, forceDecimal:true}); // seconds - rang
 var xOutput = createVariable({prefix:"X"}, xyzFormat);
 var yOutput = createVariable({prefix:"Y"}, xyzFormat);
 var feedOutput = createVariable({prefix:"F"}, feedFormat);
+var feedG0Output = createVariable({prefix:"F"}, feedFormat);
 
 // circular output
 var iOutput = createReferenceVariable({prefix:"I"}, xyzFormat);
@@ -183,7 +186,6 @@ function forceXYZ() {
 /** Force output of X, Y, Z, A, B, C, and F on next output. */
 function forceAny() {
   forceXYZ();
-  feedOutput.reset();
 }
 
 function onSection() {
@@ -321,20 +323,25 @@ function onSection() {
   if (properties.useRetracts) {
 
     var initialPosition = getFramePosition(currentSection.getInitialPosition());
+    var f = rapidFeedBlock();
 
     if (insertToolCall || retracted) {
 
       if (!machineConfiguration.isHeadConfiguration()) {
         writeBlock(
           gAbsIncModal.format(90),
-          gMotionModal.format(0), xOutput.format(initialPosition.x), yOutput.format(initialPosition.y)
+          gMotionModal.format(0),
+          xOutput.format(initialPosition.x),
+          yOutput.format(initialPosition.y),
+          f
         );
       } else {
         writeBlock(
           gAbsIncModal.format(90),
           gMotionModal.format(0),
           xOutput.format(initialPosition.x),
-          yOutput.format(initialPosition.y)
+          yOutput.format(initialPosition.y),
+          f
         );
       }
     } else {
@@ -342,7 +349,8 @@ function onSection() {
         gAbsIncModal.format(90),
         gMotionModal.format(0),
         xOutput.format(initialPosition.x),
-        yOutput.format(initialPosition.y)
+        yOutput.format(initialPosition.y),
+        f
       );
     }
   } else {
@@ -426,6 +434,14 @@ function onPower(power) {
   setDeviceMode(power);
 }
 
+function rapidFeedBlock() {
+  if (properties.g0feed > 0) {
+    return feedG0Output.format(properties.g0feed);
+  } else {
+    return "";
+  }
+}
+
 function onRapid(_x, _y, _z) {
 
   if (!properties.useRetracts && ((movement == MOVEMENT_RAPID) || (movement == MOVEMENT_HIGH_FEED))) {
@@ -446,8 +462,7 @@ function onRapid(_x, _y, _z) {
       error(localize("Radius compensation mode cannot be changed at rapid traversal."));
       return;
     }
-    writeBlock(gMotionModal.format(0), x, y);
-    feedOutput.reset();
+    writeBlock(gMotionModal.format(0), x, y, rapidFeedBlock());
   }
 }
 
@@ -493,6 +508,7 @@ function onLinear(_x, _y, _z, feed) {
   } else if (f) {
     if (getNextRecord().isMotion()) { // try not to output feed without motion
       feedOutput.reset(); // force feed on next line
+      writeComment("feedOutput.reset - f && isMotion");
     } else {
       writeBlock(gMotionModal.format(1), f);
     }
@@ -512,7 +528,6 @@ function doSplit() {
     split = true;
     xOutput.reset();
     yOutput.reset();
-    feedOutput.reset();
   }
 }
 
