@@ -38,6 +38,7 @@ allowedCircularPlanes = undefined; // allow any circular motion
 // user-defined properties
 properties = {
   writeMachine: true, // write machine
+  homeAtStart: true, // G28 home before starting
   showSequenceNumbers: false, // show sequence numbers
   sequenceNumberStart: 10, // first sequence number
   sequenceNumberIncrement: 5, // increment for sequence numbers
@@ -49,6 +50,7 @@ properties = {
 // user-defined property definitions
 propertyDefinitions = {
   writeMachine: {title:"Write machine", description:"Output the machine settings in the header of the code.", group:0, type:"boolean"},
+  homeAtStart: {title:"Home at start", description:"Home machine with G28 at start of program", group:0, type:"boolean"},
   showSequenceNumbers: {title:"Use sequence numbers", description:"Use sequence numbers for each block of outputted code.", group:1, type:"boolean"},
   sequenceNumberStart: {title:"Start sequence number", description:"The number at which to start the sequence numbers.", group:1, type:"integer"},
   sequenceNumberIncrement: {title:"Sequence number increment", description:"The amount by which the sequence number is incremented by in each block.", group:1, type:"integer"},
@@ -185,6 +187,13 @@ function forceAny() {
 }
 
 function onSection() {
+
+  if (isFirstSection() && properties.homeAtStart) {
+    writeln("");
+    writeBlock(gFormat.format(53), formatComment("Home in G53 so that G54 offsets keep"))
+    writeBlock(gFormat.format(28), formatComment("Home all axis"));
+  }
+
   var insertToolCall = isFirstSection() ||
     currentSection.getForceToolChange && currentSection.getForceToolChange() ||
     (tool.number != getPreviousSection().getTool().number);
