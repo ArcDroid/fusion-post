@@ -72,7 +72,7 @@ var feedOutput = createVariable({prefix:"F"}, feedFormat);
 var iOutput = createReferenceVariable({prefix:"I"}, xyzFormat);
 var jOutput = createReferenceVariable({prefix:"J"}, xyzFormat);
 
-var gMotionModal = createModal({}, gFormat); // modal group 1 // G0-G3, ...
+var gMotionModal = gFormat; // modal group 1 // G0-G3, ... Marlin needs it on every line
 var gAbsIncModal = createModal({}, gFormat); // modal group 3 // G90-91
 var gUnitModal = createModal({}, gFormat); // modal group 6 // G20-21
 
@@ -316,7 +316,6 @@ function onSection() {
     var initialPosition = getFramePosition(currentSection.getInitialPosition());
 
     if (insertToolCall || retracted) {
-      gMotionModal.reset();
 
       if (!machineConfiguration.isHeadConfiguration()) {
         writeBlock(
@@ -504,7 +503,6 @@ function onLinear5D(_x, _y, _z, _a, _b, _c, feed) {
 function doSplit() {
   if (!split) {
     split = true;
-    gMotionModal.reset();
     xOutput.reset();
     yOutput.reset();
     feedOutput.reset();
