@@ -406,9 +406,9 @@ function setDeviceMode(enable) {
   if (enable != deviceOn) {
     deviceOn = enable;
     if (enable) {
-      writeComment("TURN ON CUTTING HERE");
+      writeBlock(mFormat.format(3), formatComment("Plasma ON"));
     } else {
-      writeComment("TURN OFF CUTTING HERE");
+      writeBlock(mFormat.format(5), formatComment("Plasma OFF"));
     }
   }
 }
