@@ -38,7 +38,7 @@ allowedCircularPlanes = undefined; // allow any circular motion
 // user-defined properties
 properties = {
   writeMachine: true, // write machine
-  showSequenceNumbers: true, // show sequence numbers
+  showSequenceNumbers: false, // show sequence numbers
   sequenceNumberStart: 10, // first sequence number
   sequenceNumberIncrement: 5, // increment for sequence numbers
   allowHeadSwitches: true, // output code to allow heads to be manually switched for piercing and cutting
@@ -96,7 +96,7 @@ function writeBlock() {
 }
 
 function formatComment(text) {
-  return "(" + String(text).replace(/[()]/g, "") + ")";
+  return ";(" + String(text).replace(/[()]/g, "") + ")";
 }
 
 /**
@@ -353,13 +353,13 @@ function onDwell(seconds) {
 }
 
 function onCycle() {
-  onError("Drilling is not supported by CNC.");
+  error("Drilling is not supported by CNC.");
 }
 
 var pendingRadiusCompensation = -1;
 
 function onRadiusCompensation() {
-  pendingRadiusCompensation = radiusCompensation;
+  error("Radius compensation not supported by Marlin.");
 }
 
 var shapeArea = 0;
@@ -610,5 +610,4 @@ function onClose() {
   onCommand(COMMAND_COOLANT_OFF);
 
   onImpliedCommand(COMMAND_END);
-  writeBlock(mFormat.format(30)); // stop program
 }
