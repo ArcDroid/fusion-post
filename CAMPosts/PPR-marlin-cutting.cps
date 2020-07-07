@@ -12,16 +12,16 @@
   FORKID {51C1E5C7-D09E-458F-AC35-4A2CE1E0AE32}
 */
 
-description = "Jet template (DEMO ONLY)";
-vendor = "Autodesk";
-vendorUrl = "http://www.autodesk.com";
-legal = "Copyright (C) 2015-2016 by Autodesk, Inc.";
+description = "PPR V1.0";
+vendor = "2AM Innovations";
+vendorUrl = "";
+legal = "";
 certificationLevel = 2;
 minimumRevision = 39000;
 
-longDescription = "This post demonstrates the capabilities of the post processor for waterjet, laser, and plasma cutting. You can use this as a foundation when you need a post for a new CNC. Note that this post cannot be used with milling toolpath. You can only use it for 'jet' style toolpath.";
+longDescription = "";
 
-extension = "nc";
+extension = "gcode";
 setCodePage("ascii");
 
 capabilities = CAPABILITY_JET;
