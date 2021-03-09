@@ -45,7 +45,9 @@ properties = {
   sequenceNumberIncrement: 5, // increment for sequence numbers
   allowHeadSwitches: true, // output code to allow heads to be manually switched for piercing and cutting
   useRetracts: true, // output retracts - otherwise only output part contours for importing in third-party jet application
-  separateWordsWithSpace: true // specifies that the words should be separated with a white space
+  separateWordsWithSpace: true, // specifies that the words should be separated with a white space
+  delayStart: 1.0, // cutter start delay
+  delayStop: 0.1, // cutter stop delay
 };
 
 // user-defined property definitions
@@ -53,6 +55,8 @@ propertyDefinitions = {
   writeMachine: {title:"Write machine", description:"Output the machine settings in the header of the code.", group:0, type:"boolean"},
   homeAtStart: {title:"Home at start", description:"Home machine with G28 at start of program", group:0, type:"boolean"},
   g0feed: {title:"G0 Feed", description:"Feed rate for G0 moves, -1 for firmware default", group:1, type:"number"},
+  delayStart: {title:"Start delay", description:"Delay after starting cutter (seconds)", group:1, type:"number"},
+  delayStop: {title:"Stop delay", description:"Delay after stopping cutter (seconds)", group:1, type:"number"},
   showSequenceNumbers: {title:"Use sequence numbers", description:"Use sequence numbers for each block of outputted code.", group:1, type:"boolean"},
   sequenceNumberStart: {title:"Start sequence number", description:"The number at which to start the sequence numbers.", group:1, type:"integer"},
   sequenceNumberIncrement: {title:"Sequence number increment", description:"The amount by which the sequence number is incremented by in each block.", group:1, type:"integer"},
@@ -193,7 +197,12 @@ function onSection() {
   if (isFirstSection() && properties.homeAtStart) {
     writeln("");
     writeBlock(gFormat.format(53), formatComment("Home in G53 so that G54 offsets keep"))
-    writeBlock(gFormat.format(28), formatComment("Home all axis"));
+    writeBlock(gFormat.format(28), "O1", formatComment("Optional home"));
+
+    writeBlock(mFormat.format(444),
+      "S" + secFormat.format(properties.delayStart),
+      "P" + secFormat.format(properties.delayStop),
+      formatComment("cutter delays"));
   }
 
   var insertToolCall = isFirstSection() ||
@@ -363,7 +372,7 @@ function onDwell(seconds) {
     warning(localize("Dwelling time is out of range."));
   }
   seconds = clamp(0.001, seconds, 99999.999);
-  writeBlock(gFormat.format(4), "X" + secFormat.format(seconds));
+  writeBlock(gFormat.format(4), "S" + secFormat.format(seconds));
 }
 
 function onCycle() {
@@ -628,6 +637,8 @@ function onClose() {
   writeln("");
 
   onCommand(COMMAND_COOLANT_OFF);
+
+  writeBlock(mFormat.format(18), formatComment("Motors off"));
 
   onImpliedCommand(COMMAND_END);
 }
