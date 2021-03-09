@@ -48,6 +48,9 @@ properties = {
   separateWordsWithSpace: true, // specifies that the words should be separated with a white space
   delayStart: 1.0, // cutter start delay
   delayStop: 0.1, // cutter stop delay
+  probe: true,
+  useZAxis: true,
+  pierceHeight: .111
 };
 
 // user-defined property definitions
@@ -57,6 +60,9 @@ propertyDefinitions = {
   g0feed: {title:"G0 Feed", description:"Feed rate for G0 moves, -1 for firmware default", group:1, type:"number"},
   delayStart: {title:"Start delay", description:"Delay after starting cutter (seconds)", group:1, type:"number"},
   delayStop: {title:"Stop delay", description:"Delay after stopping cutter (seconds)", group:1, type:"number"},
+  probe: {title: "Probe", description: "Specifies whether to use probing.", type: "boolean", value: false, scope: "post"},
+  useZAxis: {title: "Use Z axis", description: "Specifies to enable the output for Z coordinates.", type: "boolean", value: false, scope: "post"},
+  pierceHeight: {title: "Pierce Height", description: "Specifies the pierce height.", type: "number", value: 0, scope: "post"},
   showSequenceNumbers: {title:"Use sequence numbers", description:"Use sequence numbers for each block of outputted code.", group:1, type:"boolean"},
   sequenceNumberStart: {title:"Start sequence number", description:"The number at which to start the sequence numbers.", group:1, type:"integer"},
   sequenceNumberIncrement: {title:"Sequence number increment", description:"The amount by which the sequence number is incremented by in each block.", group:1, type:"integer"},
@@ -69,11 +75,13 @@ var gFormat = createFormat({prefix:"G", decimals:0});
 var mFormat = createFormat({prefix:"M", decimals:0});
 
 var xyzFormat = createFormat({decimals:(unit == MM ? 3 : 4)});
+var zFormat = createFormat({decimals:(unit == MM ? 3 : 4)});
 var feedFormat = createFormat({decimals:(unit == MM ? 1 : 2)});
 var secFormat = createFormat({decimals:3, forceDecimal:true}); // seconds - range 0.001-1000
 
 var xOutput = createVariable({prefix:"X"}, xyzFormat);
 var yOutput = createVariable({prefix:"Y"}, xyzFormat);
+var zOutput = createVariable({prefix:"Z"}, zFormat);
 var feedOutput = createVariable({prefix:"F"}, feedFormat);
 var feedG0Output = createVariable({prefix:"F"}, feedFormat);
 
@@ -90,7 +98,6 @@ var WARNING_WORK_OFFSET = 0;
 // collected state
 var sequenceNumber;
 var currentWorkOffset;
-var split = false;
 
 /**
   Writes the specified block.
@@ -116,7 +123,6 @@ function writeComment(text) {
 }
 
 function onOpen() {
-
   if (!properties.separateWordsWithSpace) {
     setWordSeparator("");
   }
@@ -203,6 +209,8 @@ function onSection() {
       "S" + secFormat.format(properties.delayStart),
       "P" + secFormat.format(properties.delayStop),
       formatComment("cutter delays"));
+  } else {
+    writeln("");
   }
 
   var insertToolCall = isFirstSection() ||
@@ -303,6 +311,13 @@ function onSection() {
     }
   }
 
+
+  if (properties.useZAxis) {
+    addPierceHeight(true);
+  } else {
+    zOutput.disable();
+  }
+
   forceXYZ();
 
   { // pure 3D
@@ -328,42 +343,22 @@ function onSection() {
 
   forceAny();
 
-  split = false;
-  if (properties.useRetracts) {
-
-    var initialPosition = getFramePosition(currentSection.getInitialPosition());
-    var f = rapidFeedBlock();
-
-    if (insertToolCall || retracted) {
-
-      if (!machineConfiguration.isHeadConfiguration()) {
-        writeBlock(
-          gAbsIncModal.format(90),
-          gMotionModal.format(0),
-          xOutput.format(initialPosition.x),
-          yOutput.format(initialPosition.y),
-          f
-        );
-      } else {
-        writeBlock(
-          gAbsIncModal.format(90),
-          gMotionModal.format(0),
-          xOutput.format(initialPosition.x),
-          yOutput.format(initialPosition.y),
-          f
-        );
-      }
-    } else {
-      writeBlock(
-        gAbsIncModal.format(90),
-        gMotionModal.format(0),
-        xOutput.format(initialPosition.x),
-        yOutput.format(initialPosition.y),
-        f
-      );
+  var initialPosition = getFramePosition(currentSection.getInitialPosition());
+  var zIsOutput = false;
+  if (properties.useZAxis && !properties.probe) {
+    var previousFinalPosition = isFirstSection() ? initialPosition : getFramePosition(getPreviousSection().getFinalPosition());
+    if (xyzFormat.getResultingValue(previousFinalPosition.z) <= xyzFormat.getResultingValue(initialPosition.z)) {
+      writeBlock(gMotionModal.format(0), zOutput.format(initialPosition.z));
+      zIsOutput = true;
     }
-  } else {
-    split = true;
+  }
+
+  writeBlock(gMotionModal.format(0), xOutput.format(initialPosition.x), yOutput.format(initialPosition.y));
+  probeHeight();
+  heightProbed = true;
+
+  if (properties.useZAxis && !zIsOutput) {
+    writeBlock(gMotionModal.format(0), zOutput.format(initialPosition.z), formatComment("clearance height"));
   }
 }
 
@@ -385,6 +380,15 @@ function onRadiusCompensation() {
   error("Radius compensation not supported by Marlin.");
 }
 
+var heightProbed = false;
+function probeHeight() {
+  if (properties.probe) {
+    writeBlock(gFormat.format(30), "   " + formatComment("probe"));
+    writeBlock(gFormat.format(92), "Z0", formatComment("set Z 0"));
+    zOutput.reset();
+  }
+}
+
 var shapeArea = 0;
 var shapePerimeter = 0;
 var shapeSide = "inner";
@@ -392,7 +396,7 @@ var cuttingSequence = "";
 
 function onParameter(name, value) {
   if ((name == "action") && (value == "pierce")) {
-    writeComment("RUN POINT-PIERCE COMMAND HERE");
+    //writeComment("RUN POINT-PIERCE COMMAND HERE");
   } else if (name == "shapeArea") {
     shapeArea = value;
     writeComment("SHAPE AREA = " + xyzFormat.format(shapeArea));
@@ -428,13 +432,30 @@ function onParameter(name, value) {
 
 var deviceOn = false;
 
+function addPierceHeight(enabled) {
+  zFormat.setOffset(enabled ? properties.pierceHeight : 0);
+  zOutput = createVariable({prefix:"Z"}, zFormat);
+  //writeComment("pierceHeight " + (enabled ? "added" : "removed"));
+}
+
 function setDeviceMode(enable) {
   if (enable != deviceOn) {
     deviceOn = enable;
+    heightProbed = false;
+
     if (enable) {
       writeBlock(mFormat.format(3), formatComment("Plasma ON"));
+      if (zFormat.isSignificant(properties.pierceHeight)) {
+        feedOutput.reset();
+        var f = (hasParameter("operation:tool_feedEntry") ? getParameter("operation:tool_feedEntry") : toPreciseUnit(1000, MM));
+        addPierceHeight(false);
+        writeBlock(gMotionModal.format(1), zOutput.format(getCurrentPosition().z), feedOutput.format(f),
+          formatComment("top height, entry feedrate"));
+      }
     } else {
       writeBlock(mFormat.format(5), formatComment("Plasma OFF"));
+      writeln("");
+      addPierceHeight(true);
     }
   }
 }
@@ -453,38 +474,26 @@ function rapidFeedBlock() {
 
 function onRapid(_x, _y, _z) {
 
-  if (!properties.useRetracts && ((movement == MOVEMENT_RAPID) || (movement == MOVEMENT_HIGH_FEED))) {
-    doSplit();
-    return;
-  }
-
-  if (split) {
-    split = false;
-    var start = getCurrentPosition();
-    onExpandedRapid(start.x, start.y, start.z);
-  }
-
   var x = xOutput.format(_x);
   var y = yOutput.format(_y);
-  if (x || y) {
+  var z = zOutput.format(_z);
+  var justProbed = false;
+  // if plunge move, activate probe if enabled
+  if (!x && !y && z && (_z < getCurrentPosition().z) && !heightProbed && !deviceOn) {
+    probeHeight();
+    justProbed = true;
+  }
+  if (x || y || z) {
     if (pendingRadiusCompensation >= 0) {
       error(localize("Radius compensation mode cannot be changed at rapid traversal."));
       return;
     }
-    writeBlock(gMotionModal.format(0), x, y, rapidFeedBlock());
+    writeBlock(gMotionModal.format(0), x, y, z, rapidFeedBlock(),
+      justProbed ? formatComment("top height + pierce height") : "");
   }
 }
 
 function onLinear(_x, _y, _z, feed) {
-
-  if (!properties.useRetracts && ((movement == MOVEMENT_RAPID) || (movement == MOVEMENT_HIGH_FEED))) {
-    doSplit();
-    return;
-  }
-
-  if (split) {
-    resumeFromSplit(feed);
-  }
 
   // at least one axis is required
   if (pendingRadiusCompensation >= 0) {
@@ -494,26 +503,10 @@ function onLinear(_x, _y, _z, feed) {
   }
   var x = xOutput.format(_x);
   var y = yOutput.format(_y);
+  var z = zOutput.format(_z);
   var f = feedOutput.format(feed);
-  if (x || y) {
-    if (pendingRadiusCompensation >= 0) {
-      pendingRadiusCompensation = -1;
-      switch (radiusCompensation) {
-      case RADIUS_COMPENSATION_LEFT:
-        writeBlock(gFormat.format(41));
-        writeBlock(gMotionModal.format(1), x, y, f);
-        break;
-      case RADIUS_COMPENSATION_RIGHT:
-        writeBlock(gFormat.format(42));
-        writeBlock(gMotionModal.format(1), x, y, f);
-        break;
-      default:
-        writeBlock(gFormat.format(40));
-        writeBlock(gMotionModal.format(1), x, y, f);
-      }
-    } else {
-      writeBlock(gMotionModal.format(1), x, y, f);
-    }
+  if (x || y || (z && !powerIsOn)) {
+    writeBlock(gMotionModal.format(1), x, y, f);
   } else if (f) {
     if (getNextRecord().isMotion()) { // try not to output feed without motion
       feedOutput.reset(); // force feed on next line
@@ -532,41 +525,13 @@ function onLinear5D(_x, _y, _z, _a, _b, _c, feed) {
   error(localize("The CNC does not support 5-axis simultaneous toolpath."));
 }
 
-function doSplit() {
-  if (!split) {
-    split = true;
-    xOutput.reset();
-    yOutput.reset();
-  }
-}
-
-function resumeFromSplit(feed) {
-  if (split) {
-    split = false;
-    var start = getCurrentPosition();
-    var _pendingRadiusCompensation = pendingRadiusCompensation;
-    pendingRadiusCompensation = -1;
-    onExpandedLinear(start.x, start.y, start.z, feed);
-    pendingRadiusCompensation = _pendingRadiusCompensation;
-  }
-}
-
 function onCircular(clockwise, cx, cy, cz, x, y, z, feed) {
-
-  if (!properties.useRetracts && ((movement == MOVEMENT_RAPID) || (movement == MOVEMENT_HIGH_FEED))) {
-    doSplit();
-    return;
-  }
 
   // one of X/Y and I/J are required and likewise
 
   if (pendingRadiusCompensation >= 0) {
     error(localize("Radius compensation cannot be activated/deactivated for a circular move."));
     return;
-  }
-
-  if (split) {
-    resumeFromSplit(feed);
   }
 
   var start = getCurrentPosition();
