@@ -384,7 +384,7 @@ var heightProbed = false;
 function probeHeight() {
   if (properties.probe) {
     writeBlock(gFormat.format(30), "   " + formatComment("probe"));
-    writeBlock(gFormat.format(92), "Z0", formatComment("set Z 0"));
+    writeBlock(gFormat.format(92), "Z0 P1", formatComment("set Z 0 including probe offset"));
     zOutput.reset();
   }
 }
